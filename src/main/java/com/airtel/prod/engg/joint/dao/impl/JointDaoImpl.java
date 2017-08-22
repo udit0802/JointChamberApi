@@ -124,35 +124,39 @@ public class JointDaoImpl implements JointDao {
 				CableDb cableDbEnd1 = (CableDb)jdbcTemplate.queryForObject(Query.CABLE_TABLE_SELECT_QUERY, new Object[]{connectionDb.getEnd1()}, new BeanPropertyRowMapper(CableDb.class));
 				CableDb cableDbEnd2 = (CableDb)jdbcTemplate.queryForObject(Query.CABLE_TABLE_SELECT_QUERY, new Object[]{connectionDb.getEnd2()}, new BeanPropertyRowMapper(CableDb.class));
 				Connection conn = new Connection();
-				End end1 = new End();
-				end1.setCableId(cableDbEnd1.getCableId());
-				end1.setTubeId(cableDbEnd1.getTubeId());
-				end1.setColor(cableDbEnd1.getColor());
-				End end2 = new End();
-				end2.setCableId(cableDbEnd2.getCableId());
-				end2.setTubeId(cableDbEnd2.getTubeId());
-				end2.setColor(cableDbEnd2.getColor());
-				conn.setEnd1(end1);
-				conn.setEnd2(end2);
+//				End end1 = new End();
+//				end1.setCableId(cableDbEnd1.getCableId());
+//				end1.setTubeId(cableDbEnd1.getTubeId());
+//				end1.setColor(cableDbEnd1.getColor());
+//				End end2 = new End();
+//				end2.setCableId(cableDbEnd2.getCableId());
+//				end2.setTubeId(cableDbEnd2.getTubeId());
+//				end2.setColor(cableDbEnd2.getColor());
+				
+//				End end1 = getConnectionEnd(cableDbEnd1);
+//				End end2 = getConnectionEnd(cableDbEnd2);
+				
+				conn.setEnd1(setConnectionEnd(cableDbEnd1));
+				conn.setEnd2(setConnectionEnd(cableDbEnd2));
 				connections.add(conn);
 				
 				if(!cableIds.contains(cableDbEnd1.getCableId())){
-					Cable cable1 = new Cable();
-					cable1.setCableId(cableDbEnd1.getCableId());
-					cable1.setCableDirection(cableDbEnd1.getCableDirection());
-					cable1.setCableType(cableDbEnd1.getCableType());
-					cable1.setCableOrder(cableDbEnd1.getCableOrder());
-					cables.add(cable1);
+//					Cable cable1 = new Cable();
+//					cable1.setCableId(cableDbEnd1.getCableId());
+//					cable1.setCableDirection(cableDbEnd1.getCableDirection());
+//					cable1.setCableType(cableDbEnd1.getCableType());
+//					cable1.setCableOrder(cableDbEnd1.getCableOrder());
+					cables.add(setCableProperties(cableDbEnd1));
 					cableIds.add(cableDbEnd1.getCableId());
 				}
 				
 				if(!cableIds.contains(cableDbEnd2.getCableId())){
-					Cable cable2 = new Cable();
-					cable2.setCableId(cableDbEnd2.getCableId());
-					cable2.setCableDirection(cableDbEnd2.getCableDirection());
-					cable2.setCableType(cableDbEnd2.getCableType());
-					cable2.setCableOrder(cableDbEnd2.getCableOrder());
-					cables.add(cable2);
+//					Cable cable2 = new Cable();
+//					cable2.setCableId(cableDbEnd2.getCableId());
+//					cable2.setCableDirection(cableDbEnd2.getCableDirection());
+//					cable2.setCableType(cableDbEnd2.getCableType());
+//					cable2.setCableOrder(cableDbEnd2.getCableOrder());
+					cables.add(setCableProperties(cableDbEnd2));
 					cableIds.add(cableDbEnd2.getCableId());
 				}
 			}
@@ -182,5 +186,22 @@ public class JointDaoImpl implements JointDao {
 		manhole.setJoints(joints);
 		manhole.setNoOfJoints(joints.size());
 		return manhole;
+	}
+	
+	private End setConnectionEnd(CableDb cable){
+		End end = new End();
+		end.setCableId(cable.getCableId());
+		end.setTubeId(cable.getTubeId());
+		end.setColor(cable.getColor());
+		return end;
+	}
+	
+	private Cable setCableProperties(CableDb cableDb){
+		Cable cable = new Cable();
+		cable.setCableId(cableDb.getCableId());
+		cable.setCableDirection(cableDb.getCableDirection());
+		cable.setCableType(cableDb.getCableType());
+		cable.setCableOrder(cableDb.getCableOrder());
+		return cable;
 	}
 }
