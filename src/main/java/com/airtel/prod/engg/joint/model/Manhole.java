@@ -6,6 +6,8 @@ public class Manhole {
 
 	private String manholeId;
 	
+	private String manholeStatus;
+	
 	private int noOfJoints;
 	
 	private List<ManholeDuctInfo> manholeDuctInfo;
@@ -18,6 +20,14 @@ public class Manhole {
 
 	public void setManholeId(String manholeId) {
 		this.manholeId = manholeId;
+	}
+
+	public String getManholeStatus() {
+		return manholeStatus;
+	}
+
+	public void setManholeStatus(String manholeStatus) {
+		this.manholeStatus = manholeStatus;
 	}
 
 	public int getNoOfJoints() {
@@ -48,8 +58,8 @@ public class Manhole {
 
 	@Override
 	public String toString() {
-		return "Manhole [manholeId=" + manholeId + ", noOfJoints=" + noOfJoints + ", manholeDuctInfo=" + manholeDuctInfo
-				+ ", joints=" + joints + "]";
+		return "Manhole [manholeId=" + manholeId + ", manholeStatus=" + manholeStatus + ", noOfJoints=" + noOfJoints
+				+ ", manholeDuctInfo=" + manholeDuctInfo + ", joints=" + joints + "]";
 	}
 	
 }

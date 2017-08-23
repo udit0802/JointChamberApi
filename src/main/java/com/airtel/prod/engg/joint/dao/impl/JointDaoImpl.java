@@ -162,27 +162,26 @@ public class JointDaoImpl implements JointDao {
 			}
 			joint.setCableInfo(cables);
 			joint.setConnections(connections);
-			
-			List<ManholeDuctInfo> ductInfos = jdbcTemplate.query(Query.MANHOLE_TABLE_SELECT_QUERY, new Object[]{manholeNumber}, new BeanPropertyRowMapper(ManholeDuctInfo.class));
-			for(ManholeDuctInfo ductInfo : ductInfos){
-				List<Duct> ducts = new ArrayList<>();
-				for(int i = 1;i <= ductInfo.getNoOfDucts();i++){
-					ducts = jdbcTemplate.query(Query.DUCT_TABLE_SELECT_QUERY, new Object[]{ductInfo.getId()},new BeanPropertyRowMapper(Duct.class));
-					for(Duct duct : ducts){
-						Map<String,Integer> cableLoopMap = new HashMap<>();
-						List<String> cableIdsInLoop = jdbcTemplate.queryForList(Query.CABLE_TABLE_CABLE_LOOP_MAP_SELECT_QUERY, new Object[]{duct.getId()}, String.class);
-						for(String cableId : cableIdsInLoop){
-							Integer loopDistance = jdbcTemplate.queryForObject(Query.LOOP_MASTER_SELECT_QUERY, new Object[]{cableId,manholeNumber}, Integer.class);
-							cableLoopMap.put(cableId, loopDistance);
-						}
-						duct.setCableLoopMap(cableLoopMap);
-					}
-					
-				}
-				ductInfo.setDucts(ducts);
-			}
-			manhole.setManholeDuctInfo(ductInfos);
 		}
+		List<ManholeDuctInfo> ductInfos = jdbcTemplate.query(Query.MANHOLE_TABLE_SELECT_QUERY, new Object[]{manholeNumber}, new BeanPropertyRowMapper(ManholeDuctInfo.class));
+		for(ManholeDuctInfo ductInfo : ductInfos){
+			List<Duct> ducts = new ArrayList<>();
+			for(int i = 1;i <= ductInfo.getNoOfDucts();i++){
+				ducts = jdbcTemplate.query(Query.DUCT_TABLE_SELECT_QUERY, new Object[]{ductInfo.getId()},new BeanPropertyRowMapper(Duct.class));
+				for(Duct duct : ducts){
+					Map<String,Integer> cableLoopMap = new HashMap<>();
+					List<String> cableIdsInLoop = jdbcTemplate.queryForList(Query.CABLE_TABLE_CABLE_LOOP_MAP_SELECT_QUERY, new Object[]{duct.getId()}, String.class);
+					for(String cableId : cableIdsInLoop){
+						Integer loopDistance = jdbcTemplate.queryForObject(Query.LOOP_MASTER_SELECT_QUERY, new Object[]{cableId,manholeNumber}, Integer.class);
+						cableLoopMap.put(cableId, loopDistance);
+					}
+					duct.setCableLoopMap(cableLoopMap);
+				}
+				
+			}
+			ductInfo.setDucts(ducts);
+		}
+		manhole.setManholeDuctInfo(ductInfos);
 		manhole.setJoints(joints);
 		manhole.setNoOfJoints(joints.size());
 		return manhole;
