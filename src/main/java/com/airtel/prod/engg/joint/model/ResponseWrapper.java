@@ -2,33 +2,22 @@ package com.airtel.prod.engg.joint.model;
 
 public class ResponseWrapper<T> {
 
-	private String status;
-	private int responseCode;
+//	private String status;
+//	private int responseCode;
+	private Status status;
 	private Object data;
-	private String errorMessage;
+//	private String errorMessage;
 	
-	public ResponseWrapper() {
-		this.status = "success";
-		this.responseCode = 0;
-	}
-	public ResponseWrapper(String status, int responseCode, Object data, String errorMessage) {
-		super();
-		this.status = status;
-		this.responseCode = responseCode;
-		this.data = data;
-		this.errorMessage = errorMessage;
-	}
-	public String getStatus() {
+	public Status getStatus() {
 		return status;
 	}
-	public void setStatus(String status) {
+	public ResponseWrapper(Status status, Object data) {
+	super();
+	this.status = status;
+	this.data = data;
+}
+	public void setStatus(Status status) {
 		this.status = status;
-	}
-	public int getResponseCode() {
-		return responseCode;
-	}
-	public void setResponseCode(int responseCode) {
-		this.responseCode = responseCode;
 	}
 	public Object getData() {
 		return data;
@@ -36,17 +25,9 @@ public class ResponseWrapper<T> {
 	public void setData(Object data) {
 		this.data = data;
 	}
-	public String getErrorMessage() {
-		return errorMessage;
-	}
-	public void setErrorMessage(String errorMessage) {
-		this.errorMessage = errorMessage;
-	}
-	
 	@Override
 	public String toString() {
-		return "ResponseWrapper [status=" + status + ", responseCode=" + responseCode + ", data=" + data
-				+ ", errorMessage=" + errorMessage + "]";
+		return "ResponseWrapper [status=" + status + ", data=" + data + "]";
 	}
 	
 }

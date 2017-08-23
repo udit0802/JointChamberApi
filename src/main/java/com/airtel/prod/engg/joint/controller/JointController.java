@@ -11,6 +11,7 @@ import com.airtel.prod.engg.joint.constant.JointConstants;
 import com.airtel.prod.engg.joint.model.Manhole;
 import com.airtel.prod.engg.joint.model.Response;
 import com.airtel.prod.engg.joint.model.ResponseWrapper;
+import com.airtel.prod.engg.joint.model.Status;
 import com.airtel.prod.engg.joint.service.JointService;
 
 @RestController
@@ -23,12 +24,16 @@ public class JointController {
 	@RequestMapping(value = "/save/manhole", method = RequestMethod.POST,consumes = "application/json")
 	public ResponseWrapper<String> saveInfo(@RequestBody Manhole manhole){
 		ResponseWrapper<String> wrapper = null;
-		try{
+		Status status = new Status();
 		Response<String> response = new Response<String>();
+		try{
 		response.setResponse(jointService.saveInfo(manhole));
-		wrapper = new ResponseWrapper<String>(JointConstants.SUCCESS, 200, response, null);
+		status.setCode(200);
+		wrapper = new ResponseWrapper<String>(status, response);
 		}catch(Exception e){
-			wrapper = new ResponseWrapper<String>(JointConstants.FAILURE, 500, null, e.getMessage());
+			status.setCode(500);
+			status.setMessage(e.getMessage());
+			wrapper = new ResponseWrapper<String>(status, response);
 		}
 			return wrapper;
 	}
@@ -36,12 +41,16 @@ public class JointController {
 	@RequestMapping(value = "/get/manhole", method = RequestMethod.GET,produces = "application/json")
 	public ResponseWrapper<Manhole> saveInfo(@RequestParam String manholeNumber){
 		ResponseWrapper<Manhole> wrapper = null;
-		try{
+		Status status = new Status();
 		Response<Manhole> response = new Response<Manhole>();
+		try{
 		response.setResponse(jointService.getManholeInfo(manholeNumber));
-		wrapper = new ResponseWrapper<Manhole>(JointConstants.SUCCESS, 200, response, null);
+		status.setCode(200);
+		wrapper = new ResponseWrapper<Manhole>(status, response);
 		}catch(Exception e){
-			wrapper = new ResponseWrapper<Manhole>(JointConstants.FAILURE, 500, null, e.getMessage());
+			status.setCode(500);
+			status.setMessage(e.getMessage());
+			wrapper = new ResponseWrapper<Manhole>(status, response);
 		}
 			return wrapper;
 	}
