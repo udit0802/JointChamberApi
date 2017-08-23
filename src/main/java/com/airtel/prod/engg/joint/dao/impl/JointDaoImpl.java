@@ -37,30 +37,87 @@ public class JointDaoImpl implements JointDao {
 	@Override
 	public String saveInfo(Manhole manhole) throws Exception{
 		String manholeId = manhole.getManholeId();
+		getAndDeleteManholeInfo(manholeId);
 		Set<String> loopCable = new HashSet<>();
-		Map<String,Map<String,Integer>> ductCableMap = new HashMap<String, Map<String,Integer>>();;
+		Map<String,Map<String,Integer>> ductCableMap = new HashMap<String, Map<String,Integer>>();
+		Map<String,Set<String>> cableIds = new HashMap<>();
 		for(ManholeDuctInfo manholeDuctInfo : manhole.getManholeDuctInfo()){
 			String direction = manholeDuctInfo.getDirection();
 			String manHolePrimaryKey = manholeId + "_" + direction;
 			jdbcTemplate.update(Query.MANHOLE_TABLE_INSERT_QUERY, new Object[]{manHolePrimaryKey,manholeId,manholeDuctInfo.getNoOfDucts(),direction});
 			for(Duct duct : manholeDuctInfo.getDucts()){
-				String ductId = duct.getDuctId();
+				String ductId = duct.getDuctId();	
 				String ductPrimaryKey = manHolePrimaryKey + "_" + ductId;
 				ductCableMap.put(ductPrimaryKey, duct.getCableLoopMap());
+				Set<String> ductCableIds = duct.getCableLoopMap().keySet();
+				cableIds.put(ductPrimaryKey, ductCableIds);
 				jdbcTemplate.update(Query.DUCT_TABLE_INSERT_QUERY, new Object[]{ductPrimaryKey,manHolePrimaryKey,ductId,duct.getNoOfCables(),duct.getColor()});
 			}
 		}
+		Set<String> connectionCableIds = new HashSet<>();
 		for(Joint joint : manhole.getJoints()){
 			String jointId = manholeId + "_J" + joint.getJointOrder();
 			jdbcTemplate.update(Query.JOINT_TABLE_INSERT_QUERY, new Object[]{jointId,joint.getNoOfCables(),manholeId,joint.getJointOrder()});
 			for(Connection connection : joint.getConnections()){
 				String cablePrimaryKey1 = fetchCableInfo(joint,connection,ductCableMap,1,loopCable,manholeId);
 				String cablePrimaryKey2 = fetchCableInfo(joint,connection,ductCableMap,2,loopCable,manholeId);
+				connectionCableIds.add(connection.getEnd1().getCableId());
+				connectionCableIds.add(connection.getEnd2().getCableId());
 				jdbcTemplate.update(Query.CONNECTION_TABLE_INSERT_QUERY, new Object[]{cablePrimaryKey1,cablePrimaryKey2,jointId});
-			
+			}
+		}
+		for(Map.Entry<String, Set<String>> entry : cableIds.entrySet()){
+			for(String entry1 : connectionCableIds){
+				if(entry.getValue().contains(entry1)){
+					entry.getValue().remove(entry1);
+				}
+			}
+		}
+		for(Map.Entry<String, Set<String>> entry : cableIds.entrySet()){
+			for(String cableId : entry.getValue()){
+				Integer loopDistance = ductCableMap.get(entry.getKey()).get(cableId);
+				if(loopDistance != null){
+					String cablePrimaryKey = entry.getKey() + "_" + cableId;
+					jdbcTemplate.update(Query.CABLE_TABLE_INSERT_QUERY, new Object[]{cablePrimaryKey,entry.getKey(),cableId,null,null,null,null,-1});
+					jdbcTemplate.update(Query.LOOP_TABLE_INSERT_QUERY, new Object[]{cableId,loopDistance,manholeId});
+				}
 			}
 		}
 		return JointConstants.SUCCESS;
+	}
+	
+	private void getAndDeleteManholeInfo(String manholeId){
+		List<String> jointIds = jdbcTemplate.queryForList(Query.JOINT_TABLE_SELECT_IDS, new Object[]{manholeId}, String.class);
+		for(String jointId : jointIds){
+			List<ConnectionDb> connectionsInJoint = jdbcTemplate.query(Query.CONNECTION_TABLE_SELECT_QUERY, new Object[]{jointId}, new BeanPropertyRowMapper(ConnectionDb.class));
+			List<String> cableIds = new ArrayList<>();
+			for(ConnectionDb connection : connectionsInJoint ){
+				cableIds.add(connection.getEnd1());
+				cableIds.add(connection.getEnd2());
+				
+			}
+			jdbcTemplate.update(Query.CONNECTION_MASTER_DELETE,new Object[]{jointId});
+			for(String cableId : cableIds){
+				jdbcTemplate.update(Query.CABLE_MASTER_DELETE,new Object[]{cableId});
+			}
+			jdbcTemplate.update(Query.JOINT_MASTER_DELETE,new Object[]{jointId});
+		}
+		
+		List<String> manholePrimaryKeys = jdbcTemplate.queryForList(Query.MANHOLE_MASTER_FETCH_PK, new Object[]{manholeId}, String.class);
+		if(manholePrimaryKeys.isEmpty()){
+			return;
+		}
+		for(String manholePrimaryKey : manholePrimaryKeys){
+			List<String> ductIds = jdbcTemplate.queryForList(Query.DUCT_MASTER_FETCH_PK, new Object[]{manholePrimaryKey}, String.class);
+			for(String ductId : ductIds){
+				List<String> cableIds = jdbcTemplate.queryForList(Query.CABLE_MASTER_FETCH_PK, new Object[]{ductId}, String.class);
+				for(String cableId : cableIds){
+					jdbcTemplate.update(Query.CABLE_MASTER_DELETE,new Object[]{cableId});
+				}
+				jdbcTemplate.update(Query.DUCT_MASTER_DELETE_PK,new Object[]{ductId});
+			}
+			jdbcTemplate.update(Query.MANHOLE_MASTER_DELETE_PK,new Object[]{manholePrimaryKey});
+		}
 	}
 	
 	private String fetchCableInfo(Joint joint,Connection connection,Map<String,Map<String,Integer>> ductCableMap,int endNumber,Set<String> cableMap,String manholeNumber)throws Exception{
