@@ -1,6 +1,7 @@
 package com.airtel.prod.engg.joint.dao.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -11,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import com.airtel.prod.engg.joint.constant.JointConstants;
 import com.airtel.prod.engg.joint.constant.Query;
@@ -55,12 +58,14 @@ public class JointDaoImpl implements JointDao {
 			}
 		}
 		Set<String> connectionCableIds = new HashSet<>();
+		Map<String,Map<String,Cable>> cableOrderMap = new HashMap<>();
 		for(Joint joint : manhole.getJoints()){
 			String jointId = manholeId + "_J" + joint.getJointOrder();
+			joint.setJointId(jointId);
 			jdbcTemplate.update(Query.JOINT_TABLE_INSERT_QUERY, new Object[]{jointId,joint.getNoOfCables(),manholeId,joint.getJointOrder()});
 			for(Connection connection : joint.getConnections()){
-				String cablePrimaryKey1 = fetchCableInfo(joint,connection,ductCableMap,1,loopCable,manholeId);
-				String cablePrimaryKey2 = fetchCableInfo(joint,connection,ductCableMap,2,loopCable,manholeId);
+				String cablePrimaryKey1 = fetchCableInfo(joint,connection,ductCableMap,1,loopCable,manholeId,cableOrderMap);
+				String cablePrimaryKey2 = fetchCableInfo(joint,connection,ductCableMap,2,loopCable,manholeId,cableOrderMap);
 				connectionCableIds.add(connection.getEnd1().getCableId());
 				connectionCableIds.add(connection.getEnd2().getCableId());
 				jdbcTemplate.update(Query.CONNECTION_TABLE_INSERT_QUERY, new Object[]{cablePrimaryKey1,cablePrimaryKey2,jointId});
@@ -78,8 +83,23 @@ public class JointDaoImpl implements JointDao {
 				Integer loopDistance = ductCableMap.get(entry.getKey()).get(cableId);
 				if(loopDistance != null){
 					String cablePrimaryKey = entry.getKey() + "_" + cableId;
-					jdbcTemplate.update(Query.CABLE_TABLE_INSERT_QUERY, new Object[]{cablePrimaryKey,entry.getKey(),cableId,null,null,null,null,-1});
-					jdbcTemplate.update(Query.LOOP_TABLE_INSERT_QUERY, new Object[]{cableId,loopDistance,manholeId});
+					Map<String,Cable> jointcable = cableOrderMap.get(cableId);
+					String direction = null;
+					Integer cableType = null;
+					Integer cableOrder = -1;
+					String key = null;
+					if(jointcable != null){
+						Cable cable = new Cable();	
+						for(Map.Entry<String, Cable> jointcableentry : jointcable.entrySet()){
+							key = jointcableentry.getKey();
+							cable = jointcableentry.getValue();
+						}
+						direction = cable.getCableDirection();
+						cableType = cable.getCableType();
+						cableOrder = cable.getCableOrder();
+					}
+					jdbcTemplate.update(Query.CABLE_TABLE_INSERT_QUERY, new Object[]{cablePrimaryKey,entry.getKey(),cableId,direction,cableType,null,null,cableOrder});
+					jdbcTemplate.update(Query.LOOP_TABLE_INSERT_QUERY, new Object[]{cableId,loopDistance,manholeId,key});
 				}
 			}
 		}
@@ -116,11 +136,12 @@ public class JointDaoImpl implements JointDao {
 				}
 				jdbcTemplate.update(Query.DUCT_MASTER_DELETE_PK,new Object[]{ductId});
 			}
+			jdbcTemplate.update(Query.LOOP_MASTER_DELETE, new Object[]{manholeId});
 			jdbcTemplate.update(Query.MANHOLE_MASTER_DELETE_PK,new Object[]{manholePrimaryKey});
 		}
 	}
 	
-	private String fetchCableInfo(Joint joint,Connection connection,Map<String,Map<String,Integer>> ductCableMap,int endNumber,Set<String> cableMap,String manholeNumber)throws Exception{
+	private String fetchCableInfo(Joint joint,Connection connection,Map<String,Map<String,Integer>> ductCableMap,int endNumber,Set<String> cableMap,String manholeNumber,Map<String,Map<String,Cable>> cableOrderMap)throws Exception{
 		String cableId = null;
 		String tubeId = null;
 		String color = null;
@@ -141,8 +162,10 @@ public class JointDaoImpl implements JointDao {
 				direction = cable.getCableDirection();
 				type = cable.getCableType();
 				cableOrder = cable.getCableOrder();
-				break;
 			}
+			Map<String,Cable> map = new HashMap<>();
+			map.put(joint.getJointId(), cable);
+			cableOrderMap.put(cable.getCableId(), map);
 		}
 		Integer loopDistance = null;
 		String ductPrimaryKey = null;
@@ -158,7 +181,7 @@ public class JointDaoImpl implements JointDao {
 			cablePrimaryKey = ductPrimaryKey + "_" + cableId + "_" + tubeId + "_" + color;
 			jdbcTemplate.update(Query.CABLE_TABLE_INSERT_QUERY, new Object[]{cablePrimaryKey,ductPrimaryKey,cableId,direction,type,tubeId,color,cableOrder});
 			if(!cableMap.contains(cableId)){
-				jdbcTemplate.update(Query.LOOP_TABLE_INSERT_QUERY, new Object[]{cableId,loopDistance,manholeNumber});
+				jdbcTemplate.update(Query.LOOP_TABLE_INSERT_QUERY, new Object[]{cableId,loopDistance,manholeNumber,joint.getJointId()});
 				cableMap.add(cableId);
 			}
 			
@@ -171,6 +194,29 @@ public class JointDaoImpl implements JointDao {
 	public Manhole getManholeInfo(String manholeNumber) throws Exception {
 		Manhole manhole = new Manhole();
 		manhole.setManholeId(manholeNumber);
+		
+		List<Cable> totalcablesNotConnected = new ArrayList<>();
+		List<ManholeDuctInfo> ductInfos = jdbcTemplate.query(Query.MANHOLE_TABLE_SELECT_QUERY, new Object[]{manholeNumber}, new BeanPropertyRowMapper(ManholeDuctInfo.class));
+		for(ManholeDuctInfo ductInfo : ductInfos){
+			List<Duct> ducts = new ArrayList<>();
+			for(int i = 1;i <= ductInfo.getNoOfDucts();i++){
+				ducts = jdbcTemplate.query(Query.DUCT_TABLE_SELECT_QUERY, new Object[]{ductInfo.getId()},new BeanPropertyRowMapper(Duct.class));
+				for(Duct duct : ducts){
+					Map<String,Integer> cableLoopMap = new HashMap<>();
+					List<Cable> cablesNotConnected = jdbcTemplate.query(Query.CABLE_MASTER_CABLE_NOT_CONNECTED, new Object[]{duct.getId()}, new BeanPropertyRowMapper(Cable.class));
+					totalcablesNotConnected.addAll(cablesNotConnected);
+					List<String> cableIdsInLoop = jdbcTemplate.queryForList(Query.CABLE_TABLE_CABLE_LOOP_MAP_SELECT_QUERY, new Object[]{duct.getId()}, String.class);
+					for(String cableId : cableIdsInLoop){
+						Integer loopDistance = jdbcTemplate.queryForObject(Query.LOOP_MASTER_SELECT_QUERY, new Object[]{cableId,manholeNumber}, Integer.class);
+						cableLoopMap.put(cableId, loopDistance);
+					}
+					duct.setCableLoopMap(cableLoopMap);
+				}
+				
+			}
+			ductInfo.setDucts(ducts);
+		}
+		
 		List<Joint> joints = jdbcTemplate.query(Query.JOINT_TABLE_SELECT_QUERY, new BeanPropertyRowMapper(Joint.class),new Object[]{manholeNumber});
 		for(Joint joint : joints){
 			List<ConnectionDb> connectionsInJoint = jdbcTemplate.query(Query.CONNECTION_TABLE_SELECT_QUERY, new Object[]{joint.getJointId()}, new BeanPropertyRowMapper(ConnectionDb.class));
@@ -220,24 +266,23 @@ public class JointDaoImpl implements JointDao {
 			joint.setCableInfo(cables);
 			joint.setConnections(connections);
 		}
-		List<ManholeDuctInfo> ductInfos = jdbcTemplate.query(Query.MANHOLE_TABLE_SELECT_QUERY, new Object[]{manholeNumber}, new BeanPropertyRowMapper(ManholeDuctInfo.class));
-		for(ManholeDuctInfo ductInfo : ductInfos){
-			List<Duct> ducts = new ArrayList<>();
-			for(int i = 1;i <= ductInfo.getNoOfDucts();i++){
-				ducts = jdbcTemplate.query(Query.DUCT_TABLE_SELECT_QUERY, new Object[]{ductInfo.getId()},new BeanPropertyRowMapper(Duct.class));
-				for(Duct duct : ducts){
-					Map<String,Integer> cableLoopMap = new HashMap<>();
-					List<String> cableIdsInLoop = jdbcTemplate.queryForList(Query.CABLE_TABLE_CABLE_LOOP_MAP_SELECT_QUERY, new Object[]{duct.getId()}, String.class);
-					for(String cableId : cableIdsInLoop){
-						Integer loopDistance = jdbcTemplate.queryForObject(Query.LOOP_MASTER_SELECT_QUERY, new Object[]{cableId,manholeNumber}, Integer.class);
-						cableLoopMap.put(cableId, loopDistance);
-					}
-					duct.setCableLoopMap(cableLoopMap);
-				}
-				
+		MultiValueMap<String,Cable> cableJointMapping = new LinkedMultiValueMap();
+		for(Cable cable : totalcablesNotConnected){
+			String jointId = jdbcTemplate.queryForObject(Query.LOOP_TABLE_SELECT_JOINT, new Object[]{cable.getCableId()},String.class);
+			if(cableJointMapping.get(jointId) == null){
+				cableJointMapping.put(jointId, Arrays.asList(cable));
+			}else{
+				cableJointMapping.get(jointId).add(cable);
 			}
-			ductInfo.setDucts(ducts);
 		}
+		
+		for(Joint joint : joints){
+			List<Cable> cableInfo = joint.getCableInfo();
+			List<Cable> cablesNotCollected = cableJointMapping.get(joint.getJointId());
+			if(cablesNotCollected != null)
+				cableInfo.addAll(cablesNotCollected);
+		}
+		
 		manhole.setManholeDuctInfo(ductInfos);
 		manhole.setJoints(joints);
 		manhole.setNoOfJoints(joints.size());
